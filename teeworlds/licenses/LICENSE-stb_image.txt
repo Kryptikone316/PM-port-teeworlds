@@ -1,0 +1,11 @@
+stb_image.h
+============
+
+Source: https://github.com/nothings/stb
+
+Used by the bundled launcher menu (menu_picker) to decode the loader
+background and selector-frame PNGs, avoiding a runtime dependency on
+SDL2_image.
+
+Public domain (www.unlicense.org), alternatively licensed as MIT. See
+the file's own header comment for the full dual-license text.
