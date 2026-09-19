@@ -2,7 +2,7 @@
 
 Thanks to [Magnus Auvinen and the Teeworlds contributors](https://github.com/teeworlds/teeworlds) for creating this game, a tight little 2D shooter where the grappling hook matters more than the gun. It connects straight to the public server list, so there are real people to play against the moment it launches.
 
-Launching "Teeworlds.sh" opens a menu (D-Pad to move, A to confirm, B to cancel) to pick between the online client, a local dedicated server, or a local server with AI bots, so all three modes live behind one script instead of three.
+Launching "Teeworlds.sh" opens a menu (D-Pad to move, A or B to confirm, Back to cancel) to pick between the online client, a local dedicated server, or a local server with AI bots, so all three modes live behind one script instead of three. A and B both confirm since SDL's A/B mapping for a given controllerdb entry isn't consistent across devices -- no need to guess which one is "right" on a given pad.
 
 ## Controls
 
@@ -55,6 +55,15 @@ Both server options show a splash screen (title art plus "Server Running" / "Bot
 ## Singleplayer / bots
 
 Vanilla Teeworlds has no offline mode or AI, it's pure PvP. "Bot Server" in the menu instead runs [nheir's bMod](https://github.com/nheir/teeworlds/tree/server_bot0.7), a community server mod that fills empty slots with simple AI bots (pathfinding, weapon prediction, no teamwork) so there's someone to shoot at without anyone else online. Connect to it the same way as the regular local server, from the client's Local tab or `localhost:8303`. Edit `teeworlds/server_bot.cfg` to change the bot count (`sv_bot_slots`) or map.
+
+## GLES-only devices (Libmali)
+
+Teeworlds 0.7's renderer is desktop-OpenGL-only (fixed-function, no native GLES path), and it packs its tile atlas into a `GL_TEXTURE_3D` array purely as a memory-packing trick. Devices with a real desktop-GL driver (e.g. Panfrost) run it natively with no changes. Devices stuck on a GLES-only vendor blob (Libmali, the more common/default driver on most of these handhelds) get two things automatically, both gated by each CFW's own `libgl_*.txt` so they no-op on devices that don't need them:
+
+- **[gl4es](https://github.com/ptitSeb/gl4es)** (`gl4es.$DEVICE_ARCH/`, `LICENSE-GL4ES.txt`) translates the desktop-GL calls down to GLES so the game gets a working context at all.
+- A source patch (`src/teeworlds-patches/gles-plain-2d-tiles.patch`) drops the `GL_TEXTURE_3D` tile-array path entirely, since gl4es has no real 3D-texture implementation (confirmed from its own source -- `glTexImage3D` is a stub that silently drops the depth dimension). Tiles render from a plain 2D atlas with a computed UV subrect per tile index instead, the same technique the game already uses for sprites (`CRenderTools::SelectSprite`). Apply it against the vanilla `0.7.5` tag before building if you want that codepath fixed too; the shipped `teeworlds.aarch64` already has it baked in.
+
+Real desktop-GL Vulkan-over-Mesa alternatives (virgl/llvmpipe/zink via Westonpack+Mesapack) were tried first and ruled out: every one crashed with an identical segfault inside the vendor `libmali.so.1`'s own `eglInitialize()`/XCB path, independent of which Mesa backend was selected -- a bug in the closed-source driver's windowing-surface code, not fixable from this side.
 
 ## Compile
 

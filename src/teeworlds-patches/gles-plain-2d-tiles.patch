@@ -1,0 +1,98 @@
+--- a/src/engine/client/graphics_threaded.cpp
++++ b/src/engine/client/graphics_threaded.cpp
+@@ -357,13 +357,11 @@
+ 		Cmd.m_Flags |= CCommandBuffer::TEXFLAG_COMPRESSED;
+ 	if(m_pConfig->m_GfxTextureQuality || Flags&TEXLOAD_NORESAMPLE)
+ 		Cmd.m_Flags |= CCommandBuffer::TEXFLAG_QUALITY;
+-	if(Flags&IGraphics::TEXLOAD_ARRAY_256)
+-	{
+-		Cmd.m_Flags |= CCommandBuffer::TEXFLAG_TEXTURE3D;
+-		Cmd.m_Flags &= ~CCommandBuffer::TEXFLAG_TEXTURE2D;
+-	}
+-	if(Flags&IGraphics::TEXLOAD_MULTI_DIMENSION)
+-		Cmd.m_Flags |= CCommandBuffer::TEXFLAG_TEXTURE3D;
++	// GL_TEXTURE_3D tile-array textures are unsupported on GLES-only hardware
++	// (gl4es has no real GL_TEXTURE_3D implementation, see backend_sdl.cpp's
++	// Cmd_Texture_Create). Tiles are rendered from the plain 2D atlas instead
++	// (see CRenderTools::RenderTilemap), so TEXLOAD_ARRAY_256/MULTI_DIMENSION
++	// never need to request the 3D array path -- every texture stays 2D-only.
+ 	if(Flags&IGraphics::TEXLOAD_LINEARMIPMAPS)
+ 		Cmd.m_Flags |= CCommandBuffer::TEXTFLAG_LINEARMIPMAPS;
+ 
+--- a/src/game/client/render_map.cpp
++++ b/src/game/client/render_map.cpp
+@@ -406,14 +406,28 @@
+ 
+ 				if(Render)
+ 				{
+-					float x0 = 0;
+-					float y0 = 0;
+-					float x1 = 1;
+-					float y1 = 0;
+-					float x2 = 1;
+-					float y2 = 1;
+-					float x3 = 0;
+-					float y3 = 1;
++					// Atlas grid rect for this tile, in place of the GL_TEXTURE_3D
++					// depth layer the array-texture path used to select via Index
++					// (see the comment in CGraphics_Threaded::LoadTextureRaw).
++					// Both edges inset by 1/8 of a cell to keep bilinear sampling
++					// away from neighboring cells (SelectSprite's 1/32 only insets
++					// the far edge and is tuned for coarser sprite-sheet grids;
++					// this 16x16 tile grid still showed bleed at that margin).
++					int TileGridX = Index%16;
++					int TileGridY = Index/16;
++					float TileU0 = (TileGridX+1/8.0f)/16.0f;
++					float TileV0 = (TileGridY+1/8.0f)/16.0f;
++					float TileU1 = (TileGridX+1-1/8.0f)/16.0f;
++					float TileV1 = (TileGridY+1-1/8.0f)/16.0f;
++
++					float x0 = TileU0;
++					float y0 = TileV0;
++					float x1 = TileU1;
++					float y1 = TileV0;
++					float x2 = TileU1;
++					float y2 = TileV1;
++					float x3 = TileU0;
++					float y3 = TileV1;
+ 
+ 					if(Flags&TILEFLAG_VFLIP)
+ 					{
+@@ -445,7 +459,7 @@
+ 						y1 = Tmp;
+ 					}
+ 
+-					Graphics()->QuadsSetSubsetFree(x0, y0, x1, y1, x2, y2, x3, y3, Index);
++					Graphics()->QuadsSetSubsetFree(x0, y0, x1, y1, x2, y2, x3, y3, -1);
+ 					IGraphics::CQuadItem QuadItem(x*Scale, y*Scale, Scale, Scale);
+ 					Graphics()->QuadsDrawTL(&QuadItem, 1);
+ 				}
+--- a/src/game/client/components/mapimages.cpp
++++ b/src/game/client/components/mapimages.cpp
+@@ -45,7 +45,17 @@
+ 				FoundTileLayer = true;
+ 		}
+ 		if(FoundTileLayer)
++		{
+ 			TextureFlags = FoundQuadLayer ? IGraphics::TEXLOAD_MULTI_DIMENSION : IGraphics::TEXLOAD_ARRAY_256;
++			// Tiles are now rendered from a plain 2D atlas (see the comment in
++			// CGraphics_Threaded::LoadTextureRaw) via UV subrects into a 16x16
++			// grid. Standard mipmap generation box-filters across neighboring
++			// grid cells, bleeding a faint lattice of wrong colors into every
++			// tile edge at any zoom level the old isolated 3D-texture-array
++			// layers never suffered from. Tiles are rendered at a fixed 1:1
++			// scale already, so mipmapping buys nothing here anyway.
++			TextureFlags |= IGraphics::TEXLOAD_NOMIPMAPS;
++		}
+ 
+ 		CMapItemImage *pImg = (CMapItemImage *)pMap->GetItem(Start+i, 0, 0);
+ 		if(pImg->m_External || (pImg->m_Version > 1 && pImg->m_Format != CImageInfo::FORMAT_RGB && pImg->m_Format != CImageInfo::FORMAT_RGBA))
+@@ -84,7 +94,7 @@
+ {
+ 	if(!m_EasterIsLoaded)
+ 	{
+-		m_EasterTexture = Graphics()->LoadTexture("mapres/easter.png", IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, IGraphics::TEXLOAD_ARRAY_256);
++		m_EasterTexture = Graphics()->LoadTexture("mapres/easter.png", IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, IGraphics::TEXLOAD_ARRAY_256|IGraphics::TEXLOAD_NOMIPMAPS);
+ 		if(!m_EasterTexture.IsValid())
+ 			Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "mapimages", "Failed to load easter.png");
+ 		m_EasterIsLoaded = true;

@@ -13,6 +13,7 @@ else
 fi
 
 source $controlfolder/control.txt
+[ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 get_controls
 
 GAMEDIR=/$directory/ports/teeworlds
@@ -43,6 +44,30 @@ CHOICE="${CHOICE:--1}"
 case "$CHOICE" in
 0)
   # Vanilla (Client)
+  # Teeworlds 0.7's SDL/OpenGL backend has no native GLES path (desktop GL only,
+  # see src/engine/client/backend_sdl.cpp) -- GLES-only Mali blobs (rk3326-class,
+  # e.g. R36S/dArkOS) hand it a context that "creates" fine but returns
+  # GL_MAX_TEXTURE_SIZE=0 and never renders a texture. Route through gl4es
+  # unconditionally so the same launch path works on both GLES-only and real-
+  # desktop-GL devices.
+  if [ -f "${controlfolder}/libgl_${CFW_NAME}.txt" ]; then
+    source "${controlfolder}/libgl_${CFW_NAME}.txt"
+  else
+    source "${controlfolder}/libgl_default.txt"
+  fi
+  if [ "$LIBGL_FB" != "" ]; then
+    # teeworlds.${DEVICE_ARCH} has a hard ELF DT_NEEDED on libGL.so.1, resolved
+    # by the loader before SDL_VIDEO_GL_DRIVER ever comes into play. Some
+    # libgl_*.txt copies don't prepend gl4es.$DEVICE_ARCH to LD_LIBRARY_PATH
+    # themselves (confirmed on a real rk3326/ROCKNIX device, Sep 2026 build) --
+    # set it explicitly so the loader picks up our real gl4es/libGL.so.1
+    # instead of the system's GLES-only stub (a bind-mounted /dev/null on that
+    # device).
+    export LD_LIBRARY_PATH="$GAMEDIR/gl4es.${DEVICE_ARCH}:$LD_LIBRARY_PATH"
+    export SDL_VIDEO_GL_DRIVER="$GAMEDIR/gl4es.${DEVICE_ARCH}/libGL.so.1"
+    export SDL_VIDEO_EGL_DRIVER="$GAMEDIR/gl4es.${DEVICE_ARCH}/libEGL.so.1"
+  fi
+
   $GPTOKEYB2 "teeworlds" -c "$GAMEDIR/teeworlds.ini" &
   pm_platform_helper "$GAMEDIR/teeworlds.${DEVICE_ARCH}"
   LD_PRELOAD="$GAMEDIR/libs.${DEVICE_ARCH}/libomni_osk.so${LD_PRELOAD:+:$LD_PRELOAD}" ./teeworlds.${DEVICE_ARCH}

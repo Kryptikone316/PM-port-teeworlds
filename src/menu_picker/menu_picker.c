@@ -180,8 +180,12 @@ int main(int argc, char **argv)
 				{
 				case SDL_CONTROLLER_BUTTON_DPAD_UP: selected = (selected + NUM_OPTIONS - 1) % NUM_OPTIONS; break;
 				case SDL_CONTROLLER_BUTTON_DPAD_DOWN: selected = (selected + 1) % NUM_OPTIONS; break;
-				case SDL_CONTROLLER_BUTTON_A: result = selected; running = 0; break;
-				case SDL_CONTROLLER_BUTTON_B:
+				/* A and B both confirm -- SDL's A/B mapping for a given pad's
+				   physical buttons isn't reliable across devices/controllerdb
+				   entries (confirmed flipped on a real R36S), so don't make
+				   the user guess which one is "right". BACK still cancels. */
+				case SDL_CONTROLLER_BUTTON_A:
+				case SDL_CONTROLLER_BUTTON_B: result = selected; running = 0; break;
 				case SDL_CONTROLLER_BUTTON_BACK: result = -1; running = 0; break;
 				}
 			}

@@ -30,10 +30,140 @@ CFW Tests:
 [ ] dArkOS
 [ ] MuOS
 ROCKNIX
--> [ ] Libmali
+-> [x] Libmali (rk3326/R36S, Mali-G31 -- gl4es + GL_TEXTURE_3D engine patch confirmed working end-to-end, see below)
 -> [ ] Panfrost
 -> [ ] Adreno (Optional)
 [ ] Knulli
+
+2026-09-19: R36S/dArkOS (rk3326, Mali-G31) log showed "opengl max texture
+sizes: 0, 0(3D)" then endless "invalid texture" spam -- window/GL context
+create fine, but Teeworlds 0.7's backend is desktop-GL-only (no native GLES
+path, src/engine/client/backend_sdl.cpp), and the rk3326 Mali blob is
+GLES-only. Fixed by routing through gl4es (Pattern B, standard PortMaster
+gl4es.$DEVICE_ARCH + libgl_default.txt/SDL_VIDEO_GL_DRIVER convention --
+same one 23+ other ports on this device already use, e.g. Freedroid).
+Applied unconditionally to the client launch path (no-ops on devices with
+real desktop GL, via each CFW's own libgl_*.txt gate).
+
+Regression-checked on rk3566/ROCKNIX (192.168.10.134, previously working
+natively): that box's libgl_ROCKNIX.txt gates on a real `glxinfo` desktop-GL
+check, so LIBGL_FB stays empty and the gl4es override no-ops -- ran
+teeworlds.aarch64 directly with the fix's env, got a clean
+"max texture sizes: 16384, 16384(3D)", unchanged from before.
+
+Real fix confirmed end-to-end on genuine rk3326/ROCKNIX hardware (R36S
+reflashed to ROCKNIX Sept. 2026 build, 192.168.10.141, Mali-G31 via
+libmali-bifrost-g31-g29p1.so, glxinfo reports no desktop GL at all).
+Two things found and fixed along the way, both now baked into Teeworlds.sh:
+  1. This device's libgl_default.txt is an older/stripped catalog copy that
+     doesn't prepend gl4es.$DEVICE_ARCH to LD_LIBRARY_PATH itself. Teeworlds
+     is hard-linked against libGL.so.1 (ELF DT_NEEDED), resolved by the
+     loader before SDL_VIDEO_GL_DRIVER ever comes into play -- and this
+     device's /usr/lib/libGL.so.1 target is a bind-mounted /dev/null stub
+     (deliberate "no desktop GL here" marker). Fixed by having Teeworlds.sh
+     set LD_LIBRARY_PATH itself rather than trusting the CFW's copy.
+  2. A bare-SSH test (no real ES/PortMaster session env) hit
+     "eglQueryDevicesEXT is missing" -- turned out to be a test-harness
+     artifact, not a real bug: ROCKNIX runs games as Wayland clients
+     (SDL_VIDEODRIVER=wayland, real XDG_RUNTIME_DIR/WAYLAND_DISPLAY), which
+     a plain SSH shell doesn't have. Replicating the real session's env
+     (pulled from the live EmulationStation process) fixed it immediately --
+     a normal on-device launch through the ports menu already inherits this,
+     so no script change was needed for this part.
+Final confirmed log: "opengl max texture sizes: 16383, 16383(3D)", real
+GLES extensions detected off the actual Mali-G31 driver, map loaded,
+"gameclient: initialisation finished". No "invalid texture" anywhere.
+
+2026-09-19 (later same day): real controller-driven play session on the R36S
+confirmed the client launches and plays, but tile/platform geometry didn't
+render at all -- menu, HUD, player skins, networking all fine, just no
+ground. Root-caused via gdb backtrace (see below) to gl4es having no real
+GL_TEXTURE_3D implementation: Teeworlds packs its 256-tile atlas into a
+GL_TEXTURE_3D array purely as a memory-packing trick (glTexImage3D per
+depth layer, see backend_sdl.cpp Cmd_Texture_Create /
+CGraphics_Threaded::LoadTextureRaw's TEXLOAD_ARRAY_256 flag), and gl4es's
+glTexImage3D is a naive stub that redirects to glTexImage2D and silently
+drops the depth dimension (gl4es src/gl/texture_3d.c, "// 3d stubs", their
+own TODO comment doubts it). GLES2 (what gl4es actually targets, confirmed
+from gl4es's own init.c -- only ES1.1/ES2.0 branches exist, no ES3, and
+LIBGL_ES/LIBGL_GLES env vars don't change this) has no native GL_TEXTURE_3D
+at all regardless.
+
+Considered and ruled out first: routing through Mesa's real desktop GL via
+Westonpack+Mesapack (virgl/llvmpipe/zink all tried) -- every one hit an
+identical crash, a segfault inside the vendor libmali.so.1's own
+eglInitialize()/XCB extension-probing path (backtrace via a gdb-wrapped
+westonwrap.sh run), independent of which Mesa GL backend was selected.
+That's a bug in the closed-source Mali driver's own windowing-surface code,
+unrelated to Teeworlds/gl4es and unfixable from this side. Separately
+confirmed Panfrost (the open-source Mesa driver, real desktop GL, no gl4es
+needed) renders correctly natively -- but Libmali is the more common/default
+driver on these devices, so left as a workaround, not the real fix.
+
+Real fix: patched Teeworlds itself (Installer/Src/extracted/teeworlds-0.7.5-src)
+to stop using GL_TEXTURE_3D for tiles at all, replacing it with a plain 2D
+atlas + computed UV subrect per tile index (the same technique
+CRenderTools::SelectSprite already uses for regular sprites):
+  - src/engine/client/graphics_threaded.cpp (LoadTextureRaw): TEXLOAD_ARRAY_256
+    /TEXLOAD_MULTI_DIMENSION no longer set TEXFLAG_TEXTURE3D -- every texture
+    stays a normal 2D texture. No backend/GL-call changes needed at all;
+    Cmd_Texture_Create's existing, already-working TEXFLAG_TEXTURE2D path
+    (used everywhere else in the game) picks it up for free.
+  - src/game/client/render_map.cpp (RenderTilemap): computes the tile's atlas
+    grid rect (col = Index%16, row = Index/16) instead of the unit quad, with
+    both edges inset 1/8 of a cell to keep bilinear sampling off neighboring
+    cells; passes TextureIndex=-1 to QuadsSetSubsetFree (already-supported
+    2D-only path, existing default). Flip/rotate logic untouched -- it's a
+    pure corner permutation, works identically on any base rect.
+  - src/game/client/components/mapimages.cpp: tile-layer textures now also
+    request TEXLOAD_NOMIPMAPS. Standard mipmap generation box-filters across
+    atlas cell boundaries, which the old isolated 3D-texture-layers never
+    exposed to bleed -- showed up live as a faint lattice across every tile
+    edge. Disabling mipmaps (tiles render 1:1 anyway, no benefit lost) fixed
+    the bulk of it; the 1/8 UV inset (up from a first attempt at 1/32, which
+    still showed sparser residual seams) cleaned up the rest.
+  - Editor code (editor.cpp/io.cpp) still requests TEXLOAD_MULTI_DIMENSION
+    and its own tile-picker still assumes a working 3D array -- left alone
+    since the editor isn't reachable from this port's shipped menu (client/
+    server/bot-server only). Known, deliberate gap if the editor ever gets
+    exposed later.
+
+Rebuilt teeworlds.aarch64 from this patched source via a real aarch64
+cross-compile (gcc-aarch64-linux-gnu in WSL2 Ubuntu-24.04, Ubuntu arm64
+multiarch .deb packages for SDL2/freetype/zlib/libGL/libX11 extracted
+directly via dpkg-deb -x into a sysroot -- pnglite/wavpack needed no
+external dependency at all, both fully bundled in Teeworlds' own source
+tree via its FindPnglite.cmake/FindWavpack.cmake fallback). Final binary's
+NEEDED list matches the original shipped binary exactly (libz/libfreetype/
+libSDL2/libGL/libstdc++/libm/libgcc_s/libc, no stray ALSA/Pulse/Wayland/DRM
+deps leaking in from the build-time SDL2 despite it being a full desktop
+build -- `-Wl,--allow-shlib-undefined -Wl,--as-needed` in the toolchain file
+keeps the link clean). Confirmed via grim screenshots on real R36S/Libmali
+hardware, three iterations: dense per-tile lattice -> fainter sparse seams
+(after NOMIPMAPS) -> clean (after widening the UV inset). Real gameplay
+screenshot shows correct dirt/grass platforms, trees, sky, sun, HUD, all
+rendering properly. teeworlds.aarch64 in the Port folder is this patched
+build.
+
+Fixed same day: menu_picker.aarch64's A/B mapping was flipped on this
+controller (SDL reports the physically-intuitive "confirm" button as
+BUTTON_B, which menu_picker.c treated as cancel -- confirmed via live
+device testing, the *other* face button worked). Rather than guess which
+way to flip it (device/controllerdb-dependent, could just as easily be
+correct on a different pad), made both SDL_CONTROLLER_BUTTON_A and
+SDL_CONTROLLER_BUTTON_B confirm; BACK still cancels. Rebuilt (Installer/Src/picker/
+menu_picker.c) and cross-compiled the same way as teeworlds.aarch64;
+NEEDED list matches the original exactly (libSDL2/libm/libc only).
+Deployed to the R36S and into the Port folder, not yet live-tested with
+a real button press (device-side verification still needed).
+
+Still open:
+  - dArkOS itself (as opposed to ROCKNIX on the same R36S) remains
+    untested this session -- wasn't reachable.
+  - X55/rk3566 hasn't been retested with the new teeworlds.aarch64 (only
+    the old gl4es-plumbing fix was verified there). Should be a formality
+    given the NEEDED-list match and that Panfrost/native-GL path is
+    untouched by this patch, but not yet confirmed live.
 
 Resolutions:
 [ ] 480x320 (Optional)
