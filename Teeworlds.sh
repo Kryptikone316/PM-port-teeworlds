@@ -28,9 +28,17 @@ export HOME="$GAMEDIR/conf"
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 export OMNI_MODE=buffered
 export OMNI_EVENT_MODE=auto
-# 'a' (jump) already sends space -- reuse it as OmniOSK's confirm key instead
-# of the default Return, so grid-select works without a dedicated button.
-export OMNI_CONFIRM_KEY=space
+# D-Pad no longer sends plain arrow keys (it's movement/jump/menu now, see
+# teeworlds.ini), so OmniOSK's own nav can't rely on its arrow-key defaults
+# any more -- point it at whatever the D-Pad actually sends instead. Confirm
+# reuses Start's existing "t" (chat) rather than a dedicated button, same
+# reasoning as the old space/jump reuse: nothing new to bind, and Start
+# doing double duty as "confirm" while the keyboard has focus is harmless.
+export OMNI_UP_KEY=space
+export OMNI_DOWN_KEY=esc
+export OMNI_LEFT_KEY=a
+export OMNI_RIGHT_KEY=d
+export OMNI_CONFIRM_KEY=t
 
 PICKER_RESULT="$GAMEDIR/.picker_result"
 rm -f "$PICKER_RESULT"

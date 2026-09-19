@@ -157,13 +157,63 @@ NEEDED list matches the original exactly (libSDL2/libm/libc only).
 Deployed to the R36S and into the Port folder, not yet live-tested with
 a real button press (device-side verification still needed).
 
+2026-09-19 (later still): full controls redesign per live playtest feedback
+-- responsiveness and button layout both flagged as rough. Checked
+gptokeyb2's actual source (analog.c/config.c, C:\ports-dev\shadowgrounds\
+extras\gptokeyb2-src, per [[feedback_verify_tuning_semantics]]) rather than
+guessing:
+  - mouse_delay was already at its hard floor (config.c clamps to
+    [16,3000], ini already had 16) -- no more headroom there.
+  - deadzone_scale is the real lever: analog.c multiplies the stick vector
+    directly into px/tick, so px/sec = deadzone_scale * (1000/mouse_delay).
+    Old value (8) worked out to ~500px/sec at full deflection against a
+    stock default of 512 -- clearly under-tuned. Bumped to 16 (~1000px/sec).
+  - deadzone_mode switched axial -> scaled_radial (analog.c dz_scaled_radial:
+    smooth linear ramp from the deadzone edge instead of axial's hard
+    per-axis cutoff) for more precise aim, per explicit request.
+
+Full button remap: D-Pad left/right now mirrors the left stick (real
+movement, matching "almost any game" D-Pad convention) instead of spectate
+prev/next; D-Pad up = jump (space, doubled with X); D-Pad down = standalone
+Escape (opens the in-game menu without needing the Guide button, which
+isn't present on every device). A/R1 = fire, B = next weapon, X = jump,
+Y = previous weapon, L1 = hook. Scoreboard moved off Y onto L2+D-Pad-Up.
+Spectator functions (previous/next/toggle) consolidated under a new R2
+hold-modifier, freeing R2 from its old duplicate-fire role -- mirrors the
+existing L2 hotkey-layer pattern.
+
+Two real conflicts found and resolved by checking gptokeyb2's actual
+runtime behavior (state.c) rather than assuming: a button with both
+hold_state (opens a sub-layer) and its own keycode fires that keycode on
+every press, including presses only meant to reach the sub-layer. This
+would have broken Select (OSK toggle) if also given a bare "= esc", and
+would have broken R2 (spectate toggle) if it also confirmed a bare action
+on press. Resolved by making R2 a pure modifier (no bare action, matching
+the existing L2 pattern) and moving standalone-Escape to D-Pad Down
+instead, which has no hold_state/overlay role of its own so it carries
+zero risk of the same conflict.
+
+Also had to fix OmniOSK itself: its D-Pad navigation previously worked for
+free because the D-Pad sent plain arrow keys during normal gameplay (inert
+while alive, so reusable for OSK nav with zero extra config). Now that
+D-Pad drives real gameplay actions, OmniOSK's nav keys no longer match --
+fixed by setting OMNI_UP_KEY/DOWN_KEY/LEFT_KEY/RIGHT_KEY in Teeworlds.sh to
+mirror the new D-Pad bindings exactly (space/esc/a/d), and moving
+OMNI_CONFIRM_KEY off "space" (now claimed by jump, would have collided
+with "navigate up") onto "t" (Start/chat's existing key -- free, and
+harmless overlap since OmniOSK should hold input focus while open).
+
+Deployed teeworlds.ini + Teeworlds.sh to both R36S and X55 for live
+playtest. No binary rebuild needed (pure config/script change). Not yet
+confirmed on-device.
+
 Still open:
   - dArkOS itself (as opposed to ROCKNIX on the same R36S) remains
     untested this session -- wasn't reachable.
-  - X55/rk3566 hasn't been retested with the new teeworlds.aarch64 (only
-    the old gl4es-plumbing fix was verified there). Should be a formality
-    given the NEEDED-list match and that Panfrost/native-GL path is
-    untouched by this patch, but not yet confirmed live.
+  - New control scheme (this section) needs live confirmation on-device --
+    just deployed, not yet played.
+  - menu_picker.aarch64's A/B-both-confirm fix deployed but not yet
+    live-tested with a real button press either.
 
 Resolutions:
 [ ] 480x320 (Optional)

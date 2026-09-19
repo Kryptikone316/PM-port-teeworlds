@@ -9,20 +9,21 @@ Launching "Teeworlds.sh" opens a menu (D-Pad to move, A or B to confirm, Back to
 | Key | Action |
 |--|--|
 | Left Stick | Move |
-| D-Pad | Spectator prev/next (left/right); on-screen keyboard navigation when open |
-| A | Jump |
-| X | Fire |
-| B | Hook |
-| Y | Scoreboard |
-| L1 | Previous weapon |
-| R1 | Next weapon |
-| R2 | Fire (trigger) |
 | Right Stick | Aim |
+| D-Pad Left/Right | Move (same as left stick) |
+| D-Pad Up | Jump |
+| D-Pad Down | Menu (Escape) |
+| A | Fire |
+| B | Next weapon |
+| X | Jump |
+| Y | Previous weapon |
+| L1 | Hook |
+| R1 | Fire |
 | Start | Chat |
 | Select + D-Pad Down | Toggle on-screen keyboard |
 | Guide | Menu |
 
-Movement is on the left stick only, not the D-Pad. The D-Pad sends the actual arrow keys instead (Teeworlds doesn't bind arrows to anything while alive, only spectator prev/next), which is what makes the on-screen keyboard below able to reuse the D-Pad for its own navigation with zero risk of the two getting out of sync.
+Movement lives on both the left stick and D-Pad left/right, matching how most games use the D-Pad. Jump is doubled up too (X and D-Pad Up) since it's the single most-pressed button in the game. Fire is on both A and R1 (a face button plus a trigger, so either grip style works) and hook gets its own dedicated shoulder button (L1) instead of sharing a face button with anything else.
 
 Hold L2 for a second layer:
 
@@ -32,19 +33,36 @@ Hold L2 for a second layer:
 | B | Whisper |
 | X | Show chat log |
 | Y | Statboard |
+| D-Pad Up | Scoreboard |
 | L1 | Vote yes |
 | R1 | Vote no |
 | R2 | Screenshot |
 | Start | Emoticon |
-| Select | Toggle spectator mode |
+
+Hold R2 for spectator controls, grouped under one modifier since D-Pad left/right now drive movement instead of spectate prev/next:
+
+| Key + R2 | Action |
+|--|--|
+| D-Pad Left | Spectate previous |
+| D-Pad Right | Spectate next |
+| Back | Toggle spectator mode |
 
 ## On-screen keyboard
 
-Hold Select and tap D-Pad Down to open a full QWERTY on-screen keyboard ([OmniOSK](https://github.com/binarycounter/OmniOSK)) for typing chat messages, server addresses, or player names without a physical keyboard. The same Select+Down chord closes it again. While it's open: D-Pad moves focus around the grid, A confirms/selects the highlighted key, hold Select+B backspaces, hold Select+X switches character pages (letters/numbers/symbols). Selecting the on-screen Submit key sends the text to the game and closes the keyboard on its own.
+Hold Select and tap D-Pad Down to open a full QWERTY on-screen keyboard ([OmniOSK](https://github.com/binarycounter/OmniOSK)) for typing chat messages, server addresses, or player names without a physical keyboard. The same Select+Down chord closes it again. While it's open: D-Pad moves focus around the grid, Start confirms/selects the highlighted key, hold Select+B backspaces, hold Select+X switches character pages (letters/numbers/symbols). Selecting the on-screen Submit key sends the text to the game and closes the keyboard on its own.
 
-This is deliberately built so gptokeyb2 never has to track whether the keyboard is open or closed: the D-Pad and confirm key work identically either way, so there's no separate "keyboard mode" to fall out of sync with OmniOSK closing itself on submit. Only backspace and charset-switch need Select held, since those two would otherwise collide with in-game actions.
+This is deliberately built so gptokeyb2 never has to track whether the keyboard is open or closed: the D-Pad and confirm key work identically either way, so there's no separate "keyboard mode" to fall out of sync with OmniOSK closing itself on submit. Only backspace and charset-switch need Select held, since those two would otherwise collide with in-game actions. Since D-Pad now drives real gameplay (movement/jump/menu) instead of doing nothing while alive, OmniOSK's own navigation keys are explicitly remapped (`OMNI_UP_KEY`/`OMNI_DOWN_KEY`/`OMNI_LEFT_KEY`/`OMNI_RIGHT_KEY` in Teeworlds.sh) to whatever the D-Pad actually sends, rather than relying on its arrow-key defaults. Confirm reuses Start's existing "t" (chat) key rather than a dedicated button -- same reasoning as before, nothing new to bind, and Start doing double duty as "confirm" while the keyboard has focus is harmless.
 
-Since Select is now the keyboard-toggle modifier, the in-game menu moved to the Guide/Home button (client only; not present on every device).
+Since Select is now the keyboard-toggle modifier, the in-game menu moved to the Guide/Home button (client only; not present on every device) -- D-Pad Down works as a standalone Escape too, for devices without one.
+
+## GLES-only devices (Libmali)
+
+Teeworlds 0.7's renderer is desktop-OpenGL-only (fixed-function, no native GLES path), and it packs its tile atlas into a `GL_TEXTURE_3D` array purely as a memory-packing trick. Devices with a real desktop-GL driver (e.g. Panfrost) run it natively with no changes. Devices stuck on a GLES-only vendor blob (Libmali, the more common/default driver on most of these handhelds) get two things automatically, both gated by each CFW's own `libgl_*.txt` so they no-op on devices that don't need them:
+
+- **[gl4es](https://github.com/ptitSeb/gl4es)** (`gl4es.$DEVICE_ARCH/`, `LICENSE-GL4ES.txt`) translates the desktop-GL calls down to GLES so the game gets a working context at all.
+- A source patch (`src/teeworlds-patches/gles-plain-2d-tiles.patch`) drops the `GL_TEXTURE_3D` tile-array path entirely, since gl4es has no real 3D-texture implementation (confirmed from its own source -- `glTexImage3D` is a stub that silently drops the depth dimension). Tiles render from a plain 2D atlas with a computed UV subrect per tile index instead, the same technique the game already uses for sprites (`CRenderTools::SelectSprite`). Apply it against the vanilla `0.7.5` tag before building if you want that codepath fixed too; the shipped `teeworlds.aarch64` already has it baked in.
+
+Real desktop-GL Vulkan-over-Mesa alternatives (virgl/llvmpipe/zink via Westonpack+Mesapack) were tried first and ruled out: every one crashed with an identical segfault inside the vendor `libmali.so.1`'s own `eglInitialize()`/XCB path, independent of which Mesa backend was selected -- a bug in the closed-source driver's windowing-surface code, not fixable from this side.
 
 ## Local / LAN play
 
@@ -55,15 +73,6 @@ Both server options show a splash screen (title art plus "Server Running" / "Bot
 ## Singleplayer / bots
 
 Vanilla Teeworlds has no offline mode or AI, it's pure PvP. "Bot Server" in the menu instead runs [nheir's bMod](https://github.com/nheir/teeworlds/tree/server_bot0.7), a community server mod that fills empty slots with simple AI bots (pathfinding, weapon prediction, no teamwork) so there's someone to shoot at without anyone else online. Connect to it the same way as the regular local server, from the client's Local tab or `localhost:8303`. Edit `teeworlds/server_bot.cfg` to change the bot count (`sv_bot_slots`) or map.
-
-## GLES-only devices (Libmali)
-
-Teeworlds 0.7's renderer is desktop-OpenGL-only (fixed-function, no native GLES path), and it packs its tile atlas into a `GL_TEXTURE_3D` array purely as a memory-packing trick. Devices with a real desktop-GL driver (e.g. Panfrost) run it natively with no changes. Devices stuck on a GLES-only vendor blob (Libmali, the more common/default driver on most of these handhelds) get two things automatically, both gated by each CFW's own `libgl_*.txt` so they no-op on devices that don't need them:
-
-- **[gl4es](https://github.com/ptitSeb/gl4es)** (`gl4es.$DEVICE_ARCH/`, `LICENSE-GL4ES.txt`) translates the desktop-GL calls down to GLES so the game gets a working context at all.
-- A source patch (`src/teeworlds-patches/gles-plain-2d-tiles.patch`) drops the `GL_TEXTURE_3D` tile-array path entirely, since gl4es has no real 3D-texture implementation (confirmed from its own source -- `glTexImage3D` is a stub that silently drops the depth dimension). Tiles render from a plain 2D atlas with a computed UV subrect per tile index instead, the same technique the game already uses for sprites (`CRenderTools::SelectSprite`). Apply it against the vanilla `0.7.5` tag before building if you want that codepath fixed too; the shipped `teeworlds.aarch64` already has it baked in.
-
-Real desktop-GL Vulkan-over-Mesa alternatives (virgl/llvmpipe/zink via Westonpack+Mesapack) were tried first and ruled out: every one crashed with an identical segfault inside the vendor `libmali.so.1`'s own `eglInitialize()`/XCB path, independent of which Mesa backend was selected -- a bug in the closed-source driver's windowing-surface code, not fixable from this side.
 
 ## Compile
 
