@@ -2,6 +2,10 @@
 
 Thanks to [Magnus Auvinen and the Teeworlds contributors](https://github.com/teeworlds/teeworlds) for creating this game, a tight little 2D shooter where the grappling hook matters more than the gun. It connects straight to the public server list, so there are real people to play against the moment it launches.
 
+## Requirements
+
+Ready to run as-is: the client, both server modes, every map, and the on-screen keyboard are all bundled in this zip, no separate download needed. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
+
 ## Controls
 
 | Key | Action |
