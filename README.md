@@ -6,6 +6,8 @@ Thanks to [Magnus Auvinen and the Teeworlds contributors](https://github.com/tee
 
 Ready to run as-is: the client, both server modes, every map, and the on-screen keyboard are all bundled in this zip, no separate download needed. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
 
+Wi-Fi is required to actually play. There's no true offline singleplayer: "Vanilla (Client)" needs internet to reach the public server list, and "Bot Server" still needs a second device on the same network running its own Teeworlds client to connect in from, since the server itself is headless with no game window of its own.
+
 ## Controls
 
 | Key | Action |
