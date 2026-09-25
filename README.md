@@ -76,6 +76,8 @@ Vanilla Teeworlds has no offline mode or AI, it's pure PvP. "Bot Server" in the 
 
 ## Compile
 
+[teeworlds.com's downloads page](https://www.teeworlds.com/?page=downloads) lists seven links for 0.7.5: Windows 32bit/64bit, Linux x86/x86_64, Mac OS X, and two source downloads (`teeworlds-0.7.5-src.zip` / `teeworlds-0.7.5-src.tar.gz`, identical contents, just zip vs tar.gz). **Grab one of the two Source links.** The five platform builds (Windows/Linux/macOS) are prebuilt desktop binaries for their own architectures (x86/x86_64, or Windows PE regardless of bitness) -- none of them are usable for building this port, which targets aarch64 Linux and has to be compiled from source either way. If a platform build happens to run on some handheld/emulation layer, that's unrelated to this distribution; this port's `teeworlds.aarch64` is a native ELF binary built from the source tree below, not a repackaged copy of any platform download.
+
 ```
 cd teeworlds-0.7.5-src
 mkdir build && cd build
