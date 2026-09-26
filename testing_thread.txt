@@ -220,3 +220,50 @@ Resolutions:
 [ ] 640x480
 [ ] 720x720 (RGB30) (Optional)
 [ ] Higher resolutions (e.g., 1280)
+
+---
+
+2026-09-25: Map picker + real offline play, device-confirmed on both R36S
+and X55.
+
+Vanilla (Server) and Bot Server now launch their server in the background
+and auto-join it with the built-in client -- Bot Server in particular is
+real single-device offline singleplayer now, no second device needed. Both
+open a new pre-launch map picker first (three columns: Official/Favorites/
+Others, search via the existing OSK, L1/R1 quick-scroll) so map choice no
+longer means hand-editing a .cfg.
+
+Bugs found and fixed along the way, all confirmed on real hardware:
+  - map_picker's column width and row count were fixed constants sized for
+    the X55's 1280x720 -- overflowed both edges and pushed the hint bar
+    off-screen entirely on the R36S's 640x480. Both now computed from the
+    real window size at startup.
+  - map_picker.ini had a="return"/b="return" -- "return" isn't a real
+    gptokeyb2 key name (it's "enter"), so confirm silently did nothing.
+  - pick_map()'s own gptokeyb2 instance was never being killed cleanly --
+    plain SIGTERM left it running for an unpredictable stretch, spamming
+    tab/scoreboard into the match that followed. Fixed with pkill -9 -f by
+    its config path.
+  - Guide isn't reliably bound -- confirmed via the live per-device
+    controllerdb that the X55's active entry has no guide: mapping at all,
+    unlike the R36S's. L2 added as the reliable cancel, Guide kept as a
+    bonus.
+  - A map filename is untrusted input reaching the server's own console
+    parser via `sv_map <name>` -- ';' and '#' are meaningful there. This
+    build actually ships a map named ";).map" (harmless by luck). Now
+    filtered before use.
+  - Bot Server's bot-pathfinding precompute scales roughly cubically with
+    a map's nav-graph vertex count and is a real algorithmic ceiling, not
+    fixable by faster hardware (confirmed near-identical failure on both
+    devices for large maps, X55 only ~2x faster than R36S on the same
+    map). Scanned all 1,504 bundled maps for vertex count, then pruned the
+    803 worst (no count within a fast scan, or over 800V) out of the
+    shipped Others column -- 701 maps remain (685 Others + the 16
+    Official, kept regardless of their own vertex count since they're
+    referenced by name elsewhere). Removed maps kept, not deleted, in
+    Installer/Src/tools/discarded_maps/ in case any need restoring.
+
+Still open: rebuild+re-release the zip with the pruned map set and all of
+the above once the map picker itself gets a final live confirmation pass
+from the user (fixes were device-verified individually but not yet played
+through end-to-end as one session).
