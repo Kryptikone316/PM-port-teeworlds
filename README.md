@@ -4,9 +4,13 @@ Thanks to [Magnus Auvinen and the Teeworlds contributors](https://github.com/tee
 
 ## Requirements
 
-Ready to run as-is: the client, both server modes, every map, and the on-screen keyboard are all bundled in this zip, no separate download needed. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
+Ready to run as-is: the client, both server modes, the bundled map set, and the on-screen keyboard are all included in this zip, no separate download needed. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
 
 "Vanilla (Client)" needs Wi-Fi to reach the public server list. "Vanilla (Server)" and "Bot Server" both launch their own dedicated server in the background and join it automatically with the built-in client, so both work fully offline as real single-device singleplayer -- Bot Server fills the empty slots with AI bots, Vanilla Server just gives you an empty map to explore. Wi-Fi is only needed on top of that if you want other people on the same LAN to join in too.
+
+This port is the vanilla Teeworlds 0.7.5 client. DDNet/DDraceNetwork servers (including servers advertising DDraceNetwork Mod 0.6) are not supported; they may accept the connection but use protocol and gameplay features this client cannot interpret correctly, such as freeze/deep-freeze and custom HUD state.
+
+Menus use the active SDL display dimensions for their logical canvas, including square 720x720 displays where the original fixed layout overflowed.
 
 ## Controls
 
@@ -86,3 +90,14 @@ Typing a search filters all three columns at once to matching map names. This is
 Hold Select and tap D-Pad Down to open a full QWERTY on-screen keyboard ([OmniOSK](https://github.com/binarycounter/OmniOSK)) for typing chat messages, server addresses, or player names without a physical keyboard. The same Select+Down chord closes it again. While it's open: D-Pad moves focus around the grid, Start confirms/selects the highlighted key, hold Select+B backspaces, hold Select+X switches character pages (letters/numbers/symbols). Selecting the on-screen Submit key sends the text to the game and closes the keyboard on its own.
 
 Since Select is the keyboard-toggle modifier, the in-game menu lives on the Guide/Home button (client only; not present on every device) -- D-Pad Down works as a standalone Escape too, for devices without one.
+
+## Compile
+
+Run these commands from this port directory in an AArch64 Ubuntu build environment with the PortMaster SDL2 development environment available:
+
+```bash
+git clone --branch 0.7.5 --depth 1 https://github.com/teeworlds/teeworlds.git teeworlds-src
+patch -d teeworlds-src -p1 < patches/teeworlds-square-display-ui.patch
+cmake -S teeworlds-src -B teeworlds-build -DCMAKE_BUILD_TYPE=Release -DCLIENT=ON -DDOWNLOAD_GTEST=OFF -DPREFER_BUNDLED_LIBS=ON
+cmake --build teeworlds-build --target teeworlds
+```

@@ -13,7 +13,7 @@ This port's `teeworlds/data/maps/` ships 701, not the full ~1,500 -- see the Bot
 ```
 cd teeworlds-0.7.5-src
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCLIENT=ON -DDOWNLOAD_GTEST=OFF -DPREFER_BUNDLED_LIBS=OFF ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCLIENT=ON -DDOWNLOAD_GTEST=OFF -DPREFER_BUNDLED_LIBS=ON ..
 cmake --build . --target teeworlds -j$(nproc)
 ```
 

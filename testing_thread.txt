@@ -35,6 +35,12 @@ ROCKNIX
 -> [ ] Adreno (Optional)
 [ ] Knulli
 
+Compliance follow-up matrix (2026-11-12): the package still needs fresh
+device confirmation on AmberELEC, dArkOS, MuOS, Knulli, ROCKNIX Panfrost,
+and ROCKNIX Libmali. Validate 640x480, 1024x768, 1280x720, 720x720, and
+320x240 where hardware supports them; retain the existing confirmed
+ROCKNIX Libmali result as historical evidence until repeated.
+
 2026-09-19: R36S/dArkOS (rk3326, Mali-G31) log showed "opengl max texture
 sizes: 0, 0(3D)" then endless "invalid texture" spam -- window/GL context
 create fine, but Teeworlds 0.7's backend is desktop-GL-only (no native GLES
@@ -128,12 +134,11 @@ CRenderTools::SelectSprite already uses for regular sprites):
     server/bot-server only). Known, deliberate gap if the editor ever gets
     exposed later.
 
-Rebuilt teeworlds.aarch64 from this patched source via a real aarch64
-cross-compile (gcc-aarch64-linux-gnu in WSL2 Ubuntu-24.04, Ubuntu arm64
-multiarch .deb packages for SDL2/freetype/zlib/libGL/libX11 extracted
-directly via dpkg-deb -x into a sysroot -- pnglite/wavpack needed no
-external dependency at all, both fully bundled in Teeworlds' own source
-tree via its FindPnglite.cmake/FindWavpack.cmake fallback). Final binary's
+Rebuilt teeworlds.aarch64 from this patched source in the Mint checkout
+using the PortMaster AArch64 builder container. The final binary uses the
+PortMaster SDL2/FreeType/GL runtime libraries while pnglite, wavpack,
+zlib, and the other Teeworlds external components are compiled from the
+source tree. Final binary's
 NEEDED list matches the original shipped binary exactly (libz/libfreetype/
 libSDL2/libGL/libstdc++/libm/libgcc_s/libc, no stray ALSA/Pulse/Wayland/DRM
 deps leaking in from the build-time SDL2 despite it being a full desktop
@@ -159,7 +164,7 @@ a real button press (device-side verification still needed).
 
 2026-09-19 (later still): full controls redesign per live playtest feedback
 -- responsiveness and button layout both flagged as rough. Checked
-gptokeyb2's actual source (analog.c/config.c, C:\ports-dev\shadowgrounds\
+gptokeyb2's actual source (analog.c/config.c, /home/kryptik/ports/ports-dev/shadowgrounds/
 extras\gptokeyb2-src, per [[feedback_verify_tuning_semantics]]) rather than
 guessing:
   - mouse_delay was already at its hard floor (config.c clamps to
