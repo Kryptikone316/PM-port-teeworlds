@@ -4,7 +4,7 @@ Thanks to [Magnus Auvinen and the Teeworlds contributors](https://github.com/tee
 
 ## Requirements
 
-Ready to run as-is: the client, both server modes, the bundled map set, and the on-screen keyboard are all included in this zip, no separate download needed. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
+Ready to run as-is: the client, both server modes, the bundled map set, and the on-screen keyboard are all included in this zip, no separate download needed. The first launch unpacks the compressed game data, so allow a little extra time and free space on that launch. Just make sure PortMaster itself is up to date; it self-updates whenever it's run, so this is normally already the case.
 
 "Vanilla (Client)" needs Wi-Fi to reach the public server list. "Vanilla (Server)" and "Bot Server" both launch their own dedicated server in the background and join it automatically with the built-in client, so both work fully offline as real single-device singleplayer -- Bot Server fills the empty slots with AI bots, Vanilla Server just gives you an empty map to explore. Wi-Fi is only needed on top of that if you want other people on the same LAN to join in too.
 

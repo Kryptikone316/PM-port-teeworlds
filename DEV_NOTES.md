@@ -31,6 +31,11 @@ cmake -S OmniOSK -B build -DCMAKE_BUILD_TYPE=Release -DOMNI_BUILD_TESTS=OFF -DOM
 cmake --build build
 ```
 
+The shipped `teeworlds/gamedata.tar.gz` contains the bulk `data/` tree. It is created with
+ownership stripped and extracted on first launch by `Teeworlds.sh`; binaries, libraries,
+licenses, configuration, and launcher assets remain loose so the launcher can start the
+extraction safely.
+
 Needs SDL2 >= 2.0.18 at build time for the Dear ImGui SDL Renderer2 backend it uses; if the local SDL2 dev package is older, build a newer SDL2 from source and point `PKG_CONFIG_PATH` at its `.pc` file before configuring (the resulting `.so` still runs fine against an older SDL2 at runtime, since SDL2 keeps strict backward ABI compatibility).
 
 ## GLES-only devices (Libmali)

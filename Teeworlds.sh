@@ -30,6 +30,20 @@ chmod +x "$GAMEDIR"/*.${DEVICE_ARCH}
 
 > "$GAMEDIR/log.txt" && exec > >(tee "$GAMEDIR/log.txt") 2>&1
 
+ARCHIVE_FILE="$GAMEDIR/gamedata.tar.gz"
+if [[ -f "$ARCHIVE_FILE" ]]; then
+  pm_message "Extracting game data, this can take a few minutes..." --title "Please wait"
+  if ! gunzip -c "$ARCHIVE_FILE" | tar --no-same-owner -xf -; then
+    pm_show_error "Could not extract game data. Check free space and launch again." --title "Extraction failed"
+    exit 1
+  fi
+  $ESUDO rm -f "$ARCHIVE_FILE"
+elif [[ ! -f "$GAMEDIR/data/fonts/DejaVuSans.ttf" ]]; then
+  pm_show_error "Game data is missing. Reinstall the port." --title "Data missing"
+  exit 1
+fi
+pm_message_close 2>/dev/null || true
+
 bind_directories "$HOME/.teeworlds" "$GAMEDIR/conf/.teeworlds"
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 export OMNI_MODE=buffered
