@@ -55,6 +55,7 @@ export OMNI_RIGHT_KEY=d
 export OMNI_CONFIRM_KEY=t
 
 setup_gl4es() {
+  cd "$GAMEDIR" || exit 1
   if [ -f "${controlfolder}/libgl_${CFW_NAME}.txt" ]; then
     source "${controlfolder}/libgl_${CFW_NAME}.txt"
   else
@@ -63,6 +64,9 @@ setup_gl4es() {
 }
 
 run_client() {
+  if [ "${DISPLAY_WIDTH:-640}" -gt 1280 ]; then
+    sed -i "s/^deadzone_scale = .*/deadzone_scale = 48/" "$GAMEDIR/teeworlds.ini"
+  fi
   $GPTOKEYB2 "${BINARY%%.*}" -c "$GAMEDIR/teeworlds.ini" > /dev/null 2>&1 &
   pm_platform_helper "$GAMEDIR/$BINARY"
   LD_PRELOAD="$GAMEDIR/libs.${DEVICE_ARCH}/libomni_osk.so${LD_PRELOAD:+:$LD_PRELOAD}" \
