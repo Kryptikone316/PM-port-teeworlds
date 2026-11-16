@@ -61,6 +61,10 @@ setup_gl4es() {
   else
     source "${controlfolder}/libgl_default.txt"
   fi
+  # muOS RGSP needs framebuffer+FBO when GBM is present but unusable.
+  if [ "${CFW_NAME:-}" = "muOS" ]; then
+    export LIBGL_FB=2
+  fi
 }
 
 run_client() {
